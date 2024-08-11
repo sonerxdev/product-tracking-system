@@ -1,11 +1,14 @@
-from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.contrib.auth.models import AbstractBaseUser, Group, Permission
 from django.db import models
 
-class User(AbstractUser):
+class User(AbstractBaseUser):
     phone_number = models.CharField(max_length=15, unique=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
-    company_id = models.CharField(max_length=100, unique=True)    
+    company_id = models.CharField(max_length=100, unique=True)
+
+    USERNAME_FIELD = 'phone_number'
+    REQUIRED_FIELDS = ['first_name', 'last_name', 'company_id']
     groups = models.ManyToManyField(
         Group,
         related_name='custom_product_user_set',  # Unique bir related_name kullanıyoruz.
