@@ -1,8 +1,6 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
 
-# Create your models here.
-
 class User(AbstractUser):
     phone_number = models.CharField(max_length=15, unique=True)
     first_name = models.CharField(max_length=50)
@@ -10,12 +8,12 @@ class User(AbstractUser):
     company_id = models.CharField(max_length=100, unique=True)    
     groups = models.ManyToManyField(
         Group,
-        related_name='custom_product_user_set',  # Burada unique bir related_name kullanıyoruz.
+        related_name='custom_product_user_set',  # Unique bir related_name kullanıyoruz.
         blank=True
     )
     user_permissions = models.ManyToManyField(
         Permission,
-        related_name='custom_product_user_permissions',  # Burada unique bir related_name kullanıyoruz.
+        related_name='custom_product_user_permissions',  # Unique bir related_name kullanıyoruz.
         blank=True
     )
 
@@ -28,15 +26,14 @@ class Room(models.Model):
     name = models.CharField(max_length=255)
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='rooms')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_rooms')
-    stages = models.JSONField()  # Ürün aşamaları
-    
+    stages = models.JSONField()  # Ürün aşamalarını saklamak için JSONField kullanıyoruz.
     
 class RoomMember(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='members')
     role = models.CharField(max_length=50, choices=[('admin', 'Admin'), ('editor', 'Editor'), ('member', 'Member')])
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('accepted', 'Accepted')])
-    created_at = models.DateTimeField(auto_now_add=True)   
+    created_at = models.DateTimeField(auto_now_add=True)
     
 class Product(models.Model):
     name = models.CharField(max_length=255)
@@ -55,4 +52,3 @@ class Notification(models.Model):
     type = models.CharField(max_length=50, choices=[('invitation', 'Invitation'), ('product_added', 'Product Added'), ('product_updated', 'Product Updated')])
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('accepted', 'Accepted'), ('rejected', 'Rejected')], null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-        
