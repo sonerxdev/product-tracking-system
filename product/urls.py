@@ -1,9 +1,10 @@
 # product/urls.py
 
 from django.urls import path
-from .views import register_user, login_user, create_room, list_rooms, room_detail, add_product, product_detail, list_notifications
+from .views import is_registered, register_user, login_user, create_room, list_rooms, room_detail, add_product, product_detail, list_notifications
 
 urlpatterns = [
+    path('is_registered/', is_registered, name='is_registered'),
     path('register/', register_user, name='register'),
     path('login/', login_user, name='login'),
     path('rooms/', list_rooms, name='list_rooms'),

@@ -32,6 +32,20 @@ def register_user(request):
     tokens = get_tokens_for_user(user)
     return Response(tokens, status=status.HTTP_201_CREATED)
 
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def is_registered(request):
+    phone_number = request.query_params.get('phone_number')
+    if User.objects.filter(phone_number=phone_number).exists():
+        return Response({'is_registered': True}, status=status.HTTP_200_OK)
+    return Response({'is_registered': False}, status=status.HTTP_200_OK)
+
+## example usage of is_registered
+# GET /is_registered/?phone_number=5551234567
+ 
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
