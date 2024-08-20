@@ -1,3 +1,4 @@
+import random
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -22,7 +23,9 @@ def register_user(request):
     phone_number = request.data.get('phone_number')
     first_name = request.data.get('first_name')
     last_name = request.data.get('last_name')
-    company_id = request.data.get('company_id')
+    ## company_id is a unique random int we define in here
+    company_id = random.randint(100000, 999999)
+    
 
     if User.objects.filter(phone_number=phone_number).exists():
         return Response({'detail': 'Bu telefon numarası ile kayıtlı bir kullanıcı zaten var.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -31,6 +34,11 @@ def register_user(request):
     user.save()
     tokens = get_tokens_for_user(user)
     return Response(tokens, status=status.HTTP_201_CREATED)
+
+## request body for register_user
+# { "phone_number": "5551234567", "first_name": "John", "last_name": "Doe", "company_id": "123456" }
+## response body for register_user
+# { "refresh ": "eyJ0eXA ...", "access ": "eyJ0eXA ..." } 
 
 
 @api_view(['GET'])
@@ -45,7 +53,6 @@ def is_registered(request):
 # GET /is_registered/?phone_number=5551234567
  
 
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
@@ -56,6 +63,13 @@ def login_user(request):
         return Response(tokens, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'detail': 'Kullanıcı bulunamadı'}, status=status.HTTP_404_NOT_FOUND)
+    
+## request body for login_user
+# { "phone_number": "5551234567" }
+## response body for login_user
+# { "refresh ": "eyJ0eXA ...", "access ": "eyJ0eXA ..." }
+
+    
 
 @api_view(['POST'])
 def create_room(request):
