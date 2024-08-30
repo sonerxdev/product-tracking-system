@@ -17,23 +17,28 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+## phone number hariç diğer bilgiler zorunlu değil
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
     phone_number = request.data.get('phone_number')
-    first_name = request.data.get('first_name')
-    last_name = request.data.get('last_name')
-    ## company_id is a unique random int we define in here
-    company_id = random.randint(100000, 999999)
-    
-
-    if User.objects.filter(phone_number=phone_number).exists():
-        return Response({'detail': 'Bu telefon numarası ile kayıtlı bir kullanıcı zaten var.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    user = User(phone_number=phone_number, first_name=first_name, last_name=last_name, company_id=company_id)
-    user.save()
+    user, created = User.objects.get_or_create(phone_number=phone_number)
     tokens = get_tokens_for_user(user)
-    return Response(tokens, status=status.HTTP_201_CREATED)
+    if created:
+        return Response({'message': 'Kullanıcı başarıyla kaydedildi.', **tokens}, status=status.HTTP_201_CREATED)
+    else:
+        return Response({'message': 'Kullanıcı zaten kayıtlı.', **tokens}, status=status.HTTP_200_OK)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_user_info(request):
+    user = request.user
+    serializer = UserSerializer(user, data=request.data, partial=True)
+    
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 ## request body for register_user
 # { "phone_number": "5551234567", "first_name": "John", "last_name": "Doe", "company_id": "123456" }
@@ -55,23 +60,6 @@ def is_registered(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def login_user(request):
-    phone_number = request.data.get('phone_number')
-    try:
-        user = User.objects.get(phone_number=phone_number)
-        tokens = get_tokens_for_user(user)
-        return Response(tokens, status=status.HTTP_200_OK)
-    except User.DoesNotExist:
-        return Response({'detail': 'Kullanıcı bulunamadı'}, status=status.HTTP_404_NOT_FOUND)
-    
-## request body for login_user
-# { "phone_number": "5551234567" }
-## response body for login_user
-# { "refresh ": "eyJ0eXA ...", "access ": "eyJ0eXA ..." }
-
-    
-
-@api_view(['POST'])
 def create_room(request):
     serializer = RoomSerializer(data=request.data)
     if serializer.is_valid():
