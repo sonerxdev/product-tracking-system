@@ -18,32 +18,69 @@ def get_tokens_for_user(user):
     }
 
 ## phone number hariç diğer bilgiler zorunlu değil
+## diğer bilgier null olarak gönderilebilir
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
     phone_number = request.data.get('phone_number')
+    
+    if not phone_number:
+        return Response({'error': 'Telefon numarası zorunludur.'}, status=status.HTTP_400_BAD_REQUEST)
+    
     user, created = User.objects.get_or_create(phone_number=phone_number)
+    
+    # Diğer bilgileri güncelle (eğer varsa)
+    first_name = request.data.get('first_name')
+    last_name = request.data.get('last_name')
+    company_id = request.data.get('company_id')
+    
+    if first_name is not None:
+        user.first_name = first_name
+    if last_name is not None:
+        user.last_name = last_name
+    if company_id is not None:
+        user.company_id = company_id
+    
+    user.save()
+    
     tokens = get_tokens_for_user(user)
+    
     if created:
         return Response({'message': 'Kullanıcı başarıyla kaydedildi.', **tokens}, status=status.HTTP_201_CREATED)
     else:
         return Response({'message': 'Kullanıcı zaten kayıtlı.', **tokens}, status=status.HTTP_200_OK)
 
+## request body for register_user
+# { "phone_number": "5551234567", "first_name": "John", "last_name": "Doe", "company_id": "123456" }
+## response body for register_user
+# { "message": "Kullanıcı başarıyla kaydedildi.", "refresh ": "eyJ0eXA ...", "access ": "eyJ0eXA ..." } 
+
+
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_user_info(request):
     user = request.user
-    serializer = UserSerializer(user, data=request.data, partial=True)
     
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Güncellenebilir alanlar
+    fields = ['first_name', 'last_name', 'company_id']
+    
+    for field in fields:
+        value = request.data.get(field)
+        if value is not None:
+            setattr(user, field, value)
+    
+    user.save()
+    
+    # Güncellenmiş kullanıcı bilgilerini döndür
+    serializer = UserSerializer(user)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-## request body for register_user
-# { "phone_number": "5551234567", "first_name": "John", "last_name": "Doe", "company_id": "123456" }
-## response body for register_user
-# { "refresh ": "eyJ0eXA ...", "access ": "eyJ0eXA ..." } 
+## request body for update_user_info
+# { "first_name": "John", "last_name": "Doe", "company_id": "123456" }
+## response body for update_user_info
+# { "first_name": "John", "last_name": "Doe", "company_id": "123456" }
+
 
 
 @api_view(['GET'])
