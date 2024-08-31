@@ -8,7 +8,7 @@ from .models import Room, Notification, Product, RoomMember, User
 from .serializers import UserSerializer, RoomSerializer, ProductSerializer, NotificationSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
-
+import rest_framework
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -44,7 +44,10 @@ def register_user(request):
     
     user.save()
     
-    tokens = get_tokens_for_user(user)
+    try:
+        tokens = get_tokens_for_user(user)
+    except Exception as e:
+        return Response({'error': f'Token oluşturulurken hata oluştu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     if created:
         return Response({'message': 'Kullanıcı başarıyla kaydedildi.', **tokens}, status=status.HTTP_201_CREATED)
@@ -145,3 +148,44 @@ def list_notifications(request):
     notifications = Notification.objects.filter(user=request.user)
     serializer = NotificationSerializer(notifications, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def home_page(request):
+    user = request.user
+    print(f"User ID: {user.id}")
+    print(f"User Phone: {user.phone_number}")
+    
+    if not user.is_authenticated:
+        return Response({
+            'detail': 'Kullanıcı kimliği doğrulanamadı.',
+            'code': 'authentication_failed'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+    
+    try:
+        # Kullanıcının ait olduğu odayı bul
+        room_member = RoomMember.objects.filter(user=user).first()
+        
+        if room_member:
+            room = room_member.room
+            products = Product.objects.filter(room=room)
+            product_serializer = ProductSerializer(products, many=True)
+            room_serializer = RoomSerializer(room)
+            
+            return Response({
+                'has_room': True,
+                'room': room_serializer.data,
+                'products': product_serializer.data
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'has_room': False,
+                'message': 'Henüz bir odaya katılmadınız veya oda oluşturmadınız.'
+            }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response({
+            'detail': f'Bir hata oluştu: {str(e)}',
+            'code': 'server_error'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
