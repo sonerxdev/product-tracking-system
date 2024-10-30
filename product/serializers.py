@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Room, Product, Notification, RoomMember
+from .models import User, Room, Product, Notification, RoomMember, Company
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,6 +26,13 @@ class NotificationSerializer(serializers.ModelSerializer):
         fields = ['id', 'room', 'user', 'type', 'status', 'created_at']
 
 class RoomMemberSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    
     class Meta:
         model = RoomMember
-        fields = ['id', 'user', 'room', 'role', 'status', 'created_at']
+        fields = ['id', 'user', 'role', 'status']
+
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ['id', 'name', 'company_id']

@@ -1,13 +1,15 @@
 import random
+import uuid
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
-from .models import Room, Notification, Product, RoomMember, User
-from .serializers import UserSerializer, RoomSerializer, ProductSerializer, NotificationSerializer
+from .models import Room, Notification, Product, RoomMember, User, Company
+from .serializers import UserSerializer, RoomSerializer, ProductSerializer, NotificationSerializer, RoomMemberSerializer, CompanySerializer
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 import rest_framework
 
 def get_tokens_for_user(user):
@@ -66,12 +68,21 @@ def update_user_info(request):
     user = request.user
     
     # Güncellenebilir alanlar
-    fields = ['first_name', 'last_name', 'company_id']
+    fields = ['first_name', 'last_name']
     
     for field in fields:
         value = request.data.get(field)
         if value is not None:
             setattr(user, field, value)
+    
+    # company_id'yi ayrıca ele al
+    company_id = request.data.get('company_id')
+    if company_id is not None:
+        # Eğer bu company_id'ye sahip bir şirket varsa, kullanıcıyı bu şirkete bağla
+        if Company.objects.filter(company_id=company_id).exists():
+            user.company_id = company_id
+        else:
+            return Response({'error': 'Geçersiz company_id'}, status=status.HTTP_400_BAD_REQUEST)
     
     user.save()
     
@@ -99,14 +110,72 @@ def is_registered(request):
  
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def create_room(request):
-    serializer = RoomSerializer(data=request.data)
-    if serializer.is_valid():
-        room = serializer.save(created_by=request.user)
-        RoomMember.objects.create(user=request.user, room=room, role='admin', status='accepted')
-        return Response(RoomSerializer(room).data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    name = request.data.get('name')
+    stages = request.data.get('stages')
+    
+    if not name or not stages:
+        return Response({'error': 'Oda adı ve aşamalar zorunludur.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Şirket ID'sini oluştur
+    company_id = f"COMP-{uuid.uuid4().hex[:8].upper()}"
+    
+    # Şirketi oluştur
+    company = Company.objects.create(
+        name=name,  # Oda adını şirket adı olarak kullan
+        company_id=company_id,
+        created_by=request.user
+    )
+    
+    # Odayı oluştur
+    room = Room.objects.create(
+        name=name,
+        company=company,
+        created_by=request.user,
+        stages=stages
+    )
+    
+    # Odayı oluşturan kişiyi admin olarak ekle
+    RoomMember.objects.create(
+        user=request.user,
+        room=room,
+        role='admin',
+        status='accepted'
+    )
+    
+    # Kullanıcının company_id'sini güncelle
+    request.user.company_id = company_id
+    request.user.save()
+    
+    serializer = RoomSerializer(room)
+    return Response({
+        'room': serializer.data,
+        'company_id': company_id
+    }, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def room_details(request, room_id):
+    try:
+        room = Room.objects.get(id=room_id)
+        room_members = RoomMember.objects.filter(room=room)
+        product_count = Product.objects.filter(room=room).count()
+        
+        room_serializer = RoomSerializer(room)
+        company_serializer = CompanySerializer(room.company)
+        member_serializer = RoomMemberSerializer(room_members, many=True)
+        
+        response_data = {
+            'room': room_serializer.data,
+            'company': company_serializer.data,
+            'members': member_serializer.data,
+            'product_count': product_count
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+    except Room.DoesNotExist:
+        return Response({'error': 'Oda bulunamadı.'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
 def list_rooms(request):
@@ -188,4 +257,17 @@ def home_page(request):
             'detail': f'Bir hata oluştu: {str(e)}',
             'code': 'server_error'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+## renew access token
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def refresh_token(request):
+    serializer = TokenRefreshView().get_serializer(data=request.data)
+    
+    try:
+        serializer.is_valid(raise_exception=True)
+    except TokenError as e:
+        raise InvalidToken(e.args[0])
+    
+    return Response(serializer.validated_data, status=status.HTTP_200_OK)
 

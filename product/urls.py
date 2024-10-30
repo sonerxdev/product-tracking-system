@@ -14,4 +14,6 @@ urlpatterns = [
     path('products/<int:product_id>/', product_detail, name='product_detail'),
     path('notifications/', list_notifications, name='list_notifications'),
     path('home/', views.home_page, name='home_page'),
+    path('token/refresh/', views.refresh_token, name='token_refresh'),
+    path('users/update/', views.update_user_info, name='update_user_info')
 ]
